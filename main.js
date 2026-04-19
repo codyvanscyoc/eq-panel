@@ -4,7 +4,7 @@ const path = require("path");
 const { execFile } = require("child_process");
 
 const APO_CONFIG = "C:\\Program Files\\EqualizerAPO\\config\\config.txt";
-const APO_CONFIGURATOR = "C:\\Program Files\\EqualizerAPO\\Configurator.exe";
+const APO_CONFIGURATOR = "C:\\Program Files\\EqualizerAPO\\DeviceSelector.exe";
 const APO_DIR = "C:\\Program Files\\EqualizerAPO";
 
 function apoInstalled() {
