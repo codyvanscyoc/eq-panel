@@ -1,0 +1,649 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EQ Panel</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'VT323', monospace;
+    background: #0d0d0d;
+    color: #33ff33;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 20px 16px;
+    background-image: radial-gradient(ellipse at 50% 0%, rgba(0,255,100,0.03) 0%, transparent 70%);
+    user-select: none;
+  }
+
+  h1 {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 20px;
+    color: #33ff33;
+    text-shadow: 0 0 20px #33ff33, 0 0 40px #00cc00;
+    margin-bottom: 4px;
+    letter-spacing: 4px;
+    text-align: center;
+  }
+  .subtitle { font-size: 16px; color: #1a8a1a; margin-bottom: 20px; letter-spacing: 2px; text-align: center; }
+
+  /* Setup overlay */
+  #setup-overlay {
+    display: none;
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.95);
+    z-index: 100;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 40px;
+  }
+  #setup-overlay.hidden { display: none; }
+  .setup-box {
+    background: #111;
+    border: 2px solid #33ff33;
+    padding: 32px 40px;
+    max-width: 520px;
+    text-align: center;
+    box-shadow: 0 0 40px rgba(0,255,50,0.15);
+  }
+  .setup-box h2 {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 14px;
+    color: #33ff33;
+    margin-bottom: 20px;
+    text-shadow: 0 0 10px #33ff33;
+  }
+  .setup-box p { font-size: 20px; margin-bottom: 14px; line-height: 1.5; }
+  .setup-btn {
+    padding: 10px 24px;
+    border: 2px solid #33ff33;
+    background: transparent;
+    color: #33ff33;
+    cursor: pointer;
+    font-family: 'VT323', monospace;
+    font-size: 22px;
+    letter-spacing: 2px;
+    margin: 8px;
+    transition: all 0.15s;
+  }
+  .setup-btn:hover { background: #33ff33; color: #000; box-shadow: 0 0 15px #33ff33; }
+  .setup-btn.secondary { border-color: #1a5a1a; color: #1a8a1a; }
+  .setup-btn.secondary:hover { background: #1a8a1a; color: #000; }
+
+  /* Main panel */
+  .panel {
+    background: #111;
+    border: 2px solid #33ff33;
+    padding: 22px 24px 16px;
+    width: 100%;
+    max-width: 840px;
+    box-shadow: 0 0 30px rgba(0,255,50,0.08), inset 0 0 60px rgba(0,0,0,0.5);
+    position: relative;
+  }
+  .panel::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.1) 2px, rgba(0,0,0,0.1) 4px);
+    pointer-events: none;
+  }
+
+  /* Presets */
+  .presets { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 16px; justify-content: center; }
+  .preset-btn {
+    padding: 5px 11px;
+    border: 1px solid #1a5a1a;
+    background: #0a0a0a;
+    color: #1a8a1a;
+    cursor: pointer;
+    font-family: 'VT323', monospace;
+    font-size: 17px;
+    letter-spacing: 1px;
+    transition: all 0.1s;
+  }
+  .preset-btn:hover { border-color: #33ff33; color: #33ff33; text-shadow: 0 0 8px #33ff33; }
+  .preset-btn.active { background: #33ff33; color: #000; border-color: #33ff33; text-shadow: none; box-shadow: 0 0 12px rgba(0,255,50,0.4); }
+
+  /* Preamp */
+  .preamp-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+    padding: 7px 12px;
+    border: 1px solid #1a3a1a;
+    background: #0a0a0a;
+  }
+  .preamp-row label { font-size: 18px; color: #1a8a1a; min-width: 65px; }
+  .preamp-row .val { font-size: 20px; color: #33ff33; min-width: 65px; text-align: right; text-shadow: 0 0 6px #33ff33; }
+
+  input[type=range] {
+    -webkit-appearance: none;
+    flex: 1;
+    height: 4px;
+    background: #1a3a1a;
+    outline: none;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 14px;
+    height: 20px;
+    background: #33ff33;
+    cursor: pointer;
+    box-shadow: 0 0 8px #33ff33;
+  }
+
+  /* Cut Filters Section */
+  .cut-filters {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+  .cut-box {
+    flex: 1;
+    padding: 10px 14px;
+    border: 1px solid #1a3a1a;
+    background: #0a0a0a;
+  }
+  .cut-box.active { border-color: #33ff33; }
+  .cut-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+  }
+  .cut-header label { font-size: 18px; color: #1a8a1a; }
+  .cut-header .freq-display {
+    font-size: 20px;
+    color: #33ff33;
+    text-shadow: 0 0 6px #33ff33;
+  }
+
+  /* Toggle switch */
+  .toggle {
+    width: 40px;
+    height: 20px;
+    background: #1a1a1a;
+    border: 1px solid #1a3a1a;
+    cursor: pointer;
+    position: relative;
+    display: inline-block;
+    vertical-align: middle;
+    margin-left: 8px;
+  }
+  .toggle .knob {
+    width: 16px;
+    height: 16px;
+    background: #333;
+    position: absolute;
+    top: 1px;
+    left: 1px;
+    transition: all 0.15s;
+  }
+  .toggle.on { border-color: #33ff33; }
+  .toggle.on .knob { left: 21px; background: #33ff33; box-shadow: 0 0 6px #33ff33; }
+
+  .cut-slider-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .cut-slider-row input[type=range] { flex: 1; }
+
+  /* EQ Bands */
+  .eq-section { display: flex; align-items: flex-start; margin-bottom: 8px; justify-content: center; }
+  .eq-container { display: flex; justify-content: space-between; align-items: flex-end; gap: 4px; flex: 1; }
+  .band { display: flex; flex-direction: column; align-items: center; flex: 1; }
+  .band label { font-size: 14px; color: #1a5a1a; margin-top: 6px; }
+  .band .gain-val { font-size: 16px; color: #33ff33; margin-bottom: 4px; height: 20px; text-shadow: 0 0 4px #33ff33; }
+
+  .slider-track {
+    width: 34px;
+    height: 180px;
+    background: #0a0a0a;
+    border: 1px solid #1a3a1a;
+    position: relative;
+    cursor: pointer;
+  }
+  .slider-track .zero-line { position: absolute; top: 50%; left: 2px; right: 2px; height: 1px; background: #1a3a1a; }
+  .slider-track .fill { position: absolute; left: 4px; right: 4px; }
+  .slider-track .fill.positive { background: linear-gradient(to top, #33ff33, #00ff88); box-shadow: 0 0 6px rgba(0,255,50,0.3); }
+  .slider-track .fill.negative { background: linear-gradient(to bottom, #ff3333, #ff6600); box-shadow: 0 0 6px rgba(255,50,0,0.3); }
+  .slider-track .thumb {
+    position: absolute; left: 1px; right: 1px; height: 5px;
+    background: #33ff33; transform: translateY(-50%); box-shadow: 0 0 10px #33ff33;
+  }
+
+  .scale { display: flex; flex-direction: column; justify-content: space-between; height: 180px; margin-right: 6px; }
+  .scale span { font-size: 13px; color: #1a3a1a; }
+
+  /* Status & bottom */
+  .status { font-size: 16px; color: #1a3a1a; text-align: center; margin-top: 8px; height: 20px; letter-spacing: 2px; }
+  .status.ok { color: #33ff33; text-shadow: 0 0 8px #33ff33; }
+  .bottom-row { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; }
+  .reset-btn {
+    padding: 5px 14px;
+    border: 1px solid #1a3a1a;
+    background: transparent;
+    color: #1a5a1a;
+    cursor: pointer;
+    font-family: 'VT323', monospace;
+    font-size: 16px;
+  }
+  .reset-btn:hover { border-color: #ff3333; color: #ff3333; }
+  .config-btn {
+    padding: 5px 14px;
+    border: 1px solid #1a3a1a;
+    background: transparent;
+    color: #1a5a1a;
+    cursor: pointer;
+    font-family: 'VT323', monospace;
+    font-size: 16px;
+  }
+  .config-btn:hover { border-color: #33ff33; color: #33ff33; }
+  .led {
+    width: 8px; height: 8px;
+    background: #33ff33; border-radius: 50%;
+    box-shadow: 0 0 6px #33ff33;
+    animation: blink 2s infinite;
+  }
+  @keyframes blink { 0%,90%{opacity:1} 95%{opacity:0.3} 100%{opacity:1} }
+</style>
+</head>
+<body>
+
+<!-- Setup overlay for first run -->
+<div id="setup-overlay" class="hidden">
+  <div class="setup-box" id="setup-install">
+    <h2>SETUP REQUIRED</h2>
+    <p>EQ Panel needs <strong>EqualizerAPO</strong> installed to process your audio.</p>
+    <p style="color:#1a8a1a;font-size:16px;">It's a free, open-source system-wide audio filter for Windows. Lightweight, no bloat.</p>
+    <br>
+    <button class="setup-btn" id="btn-download-apo">DOWNLOAD EQUALIZERAPO</button>
+    <br>
+    <button class="setup-btn secondary" id="btn-skip-setup">I ALREADY INSTALLED IT</button>
+  </div>
+  <div class="setup-box" id="setup-configure" style="display:none;">
+    <h2>SELECT AUDIO DEVICE</h2>
+    <p>Open the EqualizerAPO Configurator to select which audio output to apply EQ to (your JBL, headphones, etc).</p>
+    <br>
+    <button class="setup-btn" id="btn-open-config">OPEN CONFIGURATOR</button>
+    <br>
+    <button class="setup-btn secondary" id="btn-done-setup">DONE</button>
+  </div>
+</div>
+
+<!-- Main EQ Panel -->
+<h1>EQ PANEL</h1>
+<p class="subtitle">// system-wide equalizer //</p>
+
+<div class="panel" id="main-panel">
+  <div class="presets">
+    <button class="preset-btn" data-preset="flat">FLAT</button>
+    <button class="preset-btn" data-preset="bass-boost">BASS+</button>
+    <button class="preset-btn" data-preset="heavy-bass">HEAVY BASS</button>
+    <button class="preset-btn" data-preset="v-shape">V-SHAPE</button>
+    <button class="preset-btn" data-preset="vocal">VOCAL</button>
+    <button class="preset-btn" data-preset="treble">TREBLE+</button>
+    <button class="preset-btn" data-preset="loudness">LOUD</button>
+  </div>
+
+  <div class="preamp-row">
+    <label>PREAMP</label>
+    <input type="range" id="preamp" min="-20" max="10" step="0.5" value="-3">
+    <span class="val" id="preamp-val">-3.0 dB</span>
+  </div>
+
+  <!-- Low Cut / High Cut -->
+  <div class="cut-filters">
+    <div class="cut-box" id="lowcut-box">
+      <div class="cut-header">
+        <div>
+          <label>LOW CUT</label>
+          <div class="toggle" id="lowcut-toggle"><div class="knob"></div></div>
+        </div>
+        <span class="freq-display" id="lowcut-freq-display">OFF</span>
+      </div>
+      <div class="cut-slider-row">
+        <span style="font-size:13px;color:#1a3a1a;">20</span>
+        <input type="range" id="lowcut-freq" min="20" max="500" step="1" value="20">
+        <span style="font-size:13px;color:#1a3a1a;">500</span>
+      </div>
+    </div>
+    <div class="cut-box" id="highcut-box">
+      <div class="cut-header">
+        <div>
+          <label>HIGH CUT</label>
+          <div class="toggle" id="highcut-toggle"><div class="knob"></div></div>
+        </div>
+        <span class="freq-display" id="highcut-freq-display">OFF</span>
+      </div>
+      <div class="cut-slider-row">
+        <span style="font-size:13px;color:#1a3a1a;">1K</span>
+        <input type="range" id="highcut-freq" min="1000" max="20000" step="100" value="20000">
+        <span style="font-size:13px;color:#1a3a1a;">20K</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- EQ Bands -->
+  <div class="eq-section">
+    <div class="scale">
+      <span>+15</span><span>+10</span><span>+5</span><span>&nbsp;0</span><span>-5</span><span>-10</span><span>-15</span>
+    </div>
+    <div class="eq-container" id="eq-bands"></div>
+  </div>
+
+  <div class="status" id="status"></div>
+  <div class="bottom-row">
+    <button class="reset-btn" id="reset-btn">[ RESET ]</button>
+    <button class="config-btn" id="config-btn">[ DEVICES ]</button>
+    <div class="led"></div>
+  </div>
+</div>
+
+<script>
+const { ipcRenderer } = require("electron");
+
+const BANDS = [
+  { freq: 32, label: "32", q: 1.4 },
+  { freq: 64, label: "64", q: 1.4 },
+  { freq: 125, label: "125", q: 1.4 },
+  { freq: 250, label: "250", q: 1.4 },
+  { freq: 500, label: "500", q: 1.4 },
+  { freq: 1000, label: "1K", q: 1.4 },
+  { freq: 2000, label: "2K", q: 1.4 },
+  { freq: 4000, label: "4K", q: 1.4 },
+  { freq: 8000, label: "8K", q: 1.4 },
+  { freq: 16000, label: "16K", q: 1.4 },
+];
+
+const PRESETS = {
+  "flat":       { gains: [0,0,0,0,0,0,0,0,0,0], preamp: 0, lowCut: false, highCut: false },
+  "bass-boost": { gains: [6,5,3,1,0,0,0,0,0,0], preamp: -3, lowCut: false, highCut: false },
+  "heavy-bass": { gains: [10,8,5,2,0,-1,-1,0,0,0], preamp: -5, lowCut: false, highCut: false },
+  "v-shape":    { gains: [6,4,2,0,-2,-2,0,2,4,5], preamp: -3, lowCut: false, highCut: false },
+  "vocal":      { gains: [-2,-1,0,2,4,4,3,1,0,-1], preamp: -2, lowCut: { freq: 80 }, highCut: false },
+  "treble":     { gains: [0,0,0,0,0,1,3,5,6,6], preamp: -3, lowCut: false, highCut: false },
+  "loudness":   { gains: [5,4,1,0,-1,-1,0,1,4,5], preamp: -3, lowCut: { freq: 30 }, highCut: false },
+};
+
+let gains = BANDS.map(() => 0);
+let lowCutEnabled = false;
+let highCutEnabled = false;
+let debounceTimer = null;
+
+const container = document.getElementById("eq-bands");
+const preampSlider = document.getElementById("preamp");
+const preampVal = document.getElementById("preamp-val");
+const statusEl = document.getElementById("status");
+const lowcutToggle = document.getElementById("lowcut-toggle");
+const highcutToggle = document.getElementById("highcut-toggle");
+const lowcutFreq = document.getElementById("lowcut-freq");
+const highcutFreq = document.getElementById("highcut-freq");
+const lowcutDisplay = document.getElementById("lowcut-freq-display");
+const highcutDisplay = document.getElementById("highcut-freq-display");
+const lowcutBox = document.getElementById("lowcut-box");
+const highcutBox = document.getElementById("highcut-box");
+
+// --- Setup flow ---
+const overlay = document.getElementById("setup-overlay");
+const setupInstall = document.getElementById("setup-install");
+const setupConfigure = document.getElementById("setup-configure");
+
+document.getElementById("btn-download-apo").onclick = async () => {
+  await ipcRenderer.invoke("open-apo-download");
+  setupInstall.querySelector("p").textContent = "Download started! Install EqualizerAPO, then click below.";
+  document.getElementById("btn-skip-setup").textContent = "I INSTALLED IT - NEXT";
+};
+
+document.getElementById("btn-skip-setup").onclick = async () => {
+  const status = await ipcRenderer.invoke("get-status");
+  if (status.installed) {
+    setupInstall.style.display = "none";
+    setupConfigure.style.display = "block";
+  } else {
+    setupInstall.querySelector("p").textContent = "EqualizerAPO not detected yet. Install it and try again.";
+  }
+};
+
+document.getElementById("btn-open-config").onclick = async () => {
+  await ipcRenderer.invoke("open-configurator");
+};
+
+document.getElementById("btn-done-setup").onclick = () => {
+  overlay.classList.add("hidden");
+  loadState();
+};
+
+// --- Low Cut / High Cut ---
+function formatFreq(f) {
+  return f >= 1000 ? (f / 1000).toFixed(1).replace(/\.0$/, "") + "K" : f + "";
+}
+
+lowcutToggle.onclick = () => {
+  lowCutEnabled = !lowCutEnabled;
+  updateCutVisuals();
+  scheduleApply();
+};
+
+highcutToggle.onclick = () => {
+  highCutEnabled = !highCutEnabled;
+  updateCutVisuals();
+  scheduleApply();
+};
+
+lowcutFreq.oninput = () => { updateCutVisuals(); scheduleApply(); };
+highcutFreq.oninput = () => { updateCutVisuals(); scheduleApply(); };
+
+function updateCutVisuals() {
+  lowcutToggle.className = lowCutEnabled ? "toggle on" : "toggle";
+  highcutToggle.className = highCutEnabled ? "toggle on" : "toggle";
+  lowcutBox.className = lowCutEnabled ? "cut-box active" : "cut-box";
+  highcutBox.className = highCutEnabled ? "cut-box active" : "cut-box";
+  lowcutDisplay.textContent = lowCutEnabled ? formatFreq(parseInt(lowcutFreq.value)) + " Hz" : "OFF";
+  highcutDisplay.textContent = highCutEnabled ? formatFreq(parseInt(highcutFreq.value)) + " Hz" : "OFF";
+}
+
+// --- EQ Band sliders ---
+BANDS.forEach((band, i) => {
+  const div = document.createElement("div");
+  div.className = "band";
+
+  const valEl = document.createElement("div");
+  valEl.className = "gain-val";
+  valEl.id = `val-${i}`;
+  valEl.textContent = "0";
+
+  const track = document.createElement("div");
+  track.className = "slider-track";
+
+  const zeroLine = document.createElement("div");
+  zeroLine.className = "zero-line";
+  track.appendChild(zeroLine);
+
+  const fill = document.createElement("div");
+  fill.className = "fill positive";
+  fill.id = `fill-${i}`;
+  track.appendChild(fill);
+
+  const thumb = document.createElement("div");
+  thumb.className = "thumb";
+  thumb.id = `thumb-${i}`;
+  track.appendChild(thumb);
+
+  const label = document.createElement("label");
+  label.textContent = band.label;
+
+  div.appendChild(valEl);
+  div.appendChild(track);
+  div.appendChild(label);
+  container.appendChild(div);
+
+  let dragging = false;
+  function setFromY(clientY) {
+    const rect = track.getBoundingClientRect();
+    let pct = Math.max(0, Math.min(1, (clientY - rect.top) / rect.height));
+    gains[i] = Math.round((15 - pct * 30) * 2) / 2;
+    updateVisual(i);
+    clearPresetHighlight();
+    scheduleApply();
+  }
+  track.addEventListener("mousedown", e => { dragging = true; setFromY(e.clientY); });
+  document.addEventListener("mousemove", e => { if (dragging) setFromY(e.clientY); });
+  document.addEventListener("mouseup", () => { dragging = false; });
+  track.addEventListener("dblclick", () => { gains[i] = 0; updateVisual(i); scheduleApply(); });
+});
+
+function updateVisual(i) {
+  const g = gains[i];
+  document.getElementById(`val-${i}`).textContent = (g > 0 ? "+" : "") + g.toFixed(1);
+  const pct = ((15 - g) / 30) * 100;
+  document.getElementById(`thumb-${i}`).style.top = pct + "%";
+  const fill = document.getElementById(`fill-${i}`);
+  if (g >= 0) {
+    fill.className = "fill positive";
+    fill.style.top = pct + "%";
+    fill.style.height = (50 - pct) + "%";
+  } else {
+    fill.className = "fill negative";
+    fill.style.top = "50%";
+    fill.style.height = (pct - 50) + "%";
+  }
+}
+
+function updateAll() { gains.forEach((_, i) => updateVisual(i)); }
+
+// --- Preamp ---
+preampSlider.oninput = () => {
+  preampVal.textContent = parseFloat(preampSlider.value).toFixed(1) + " dB";
+  scheduleApply();
+};
+
+// --- Presets ---
+document.querySelectorAll(".preset-btn").forEach(btn => {
+  btn.addEventListener("click", () => {
+    const p = PRESETS[btn.dataset.preset];
+    gains = [...p.gains];
+    preampSlider.value = p.preamp;
+    preampVal.textContent = p.preamp.toFixed(1) + " dB";
+
+    if (p.lowCut) {
+      lowCutEnabled = true;
+      lowcutFreq.value = p.lowCut.freq;
+    } else {
+      lowCutEnabled = false;
+      lowcutFreq.value = 20;
+    }
+    if (p.highCut) {
+      highCutEnabled = true;
+      highcutFreq.value = p.highCut.freq;
+    } else {
+      highCutEnabled = false;
+      highcutFreq.value = 20000;
+    }
+    updateCutVisuals();
+    updateAll();
+    setPresetHighlight(btn.dataset.preset);
+    scheduleApply();
+  });
+});
+
+function setPresetHighlight(name) {
+  document.querySelectorAll(".preset-btn").forEach(b => b.classList.remove("active"));
+  const b = document.querySelector(`[data-preset="${name}"]`);
+  if (b) b.classList.add("active");
+}
+function clearPresetHighlight() {
+  document.querySelectorAll(".preset-btn").forEach(b => b.classList.remove("active"));
+}
+
+// --- Reset ---
+document.getElementById("reset-btn").onclick = () => {
+  gains = BANDS.map(() => 0);
+  preampSlider.value = 0;
+  preampVal.textContent = "0.0 dB";
+  lowCutEnabled = false;
+  highCutEnabled = false;
+  lowcutFreq.value = 20;
+  highcutFreq.value = 20000;
+  updateCutVisuals();
+  updateAll();
+  setPresetHighlight("flat");
+  scheduleApply();
+};
+
+// --- Devices button ---
+document.getElementById("config-btn").onclick = async () => {
+  await ipcRenderer.invoke("open-configurator");
+};
+
+// --- Apply ---
+function scheduleApply() {
+  clearTimeout(debounceTimer);
+  debounceTimer = setTimeout(applyEQ, 80);
+}
+
+async function applyEQ() {
+  const data = {
+    preamp: parseFloat(preampSlider.value),
+    bands: BANDS.map((b, i) => ({ freq: b.freq, gain: gains[i], q: b.q })),
+    lowCut: { enabled: lowCutEnabled, freq: parseInt(lowcutFreq.value), q: 0.707 },
+    highCut: { enabled: highCutEnabled, freq: parseInt(highcutFreq.value), q: 0.707 },
+  };
+  try {
+    const result = await ipcRenderer.invoke("apply-eq", data);
+    if (result.ok) {
+      statusEl.textContent = ">>> APPLIED <<<";
+      statusEl.className = "status ok";
+      setTimeout(() => { statusEl.textContent = ""; statusEl.className = "status"; }, 1200);
+    } else {
+      statusEl.textContent = "ERR: " + (result.error || "???");
+    }
+  } catch (e) {
+    statusEl.textContent = "ERROR";
+  }
+}
+
+// --- Load state ---
+async function loadState() {
+  try {
+    const data = await ipcRenderer.invoke("get-status");
+    if (!data.installed) {
+      overlay.classList.remove("hidden");
+      setupInstall.style.display = "block";
+      setupConfigure.style.display = "none";
+      return;
+    }
+    if (data.eq && data.eq.bands.length === BANDS.length) {
+      gains = data.eq.bands.map(b => b.gain);
+      preampSlider.value = data.eq.preamp;
+      preampVal.textContent = data.eq.preamp.toFixed(1) + " dB";
+      if (data.eq.lowCut && data.eq.lowCut.enabled) {
+        lowCutEnabled = true;
+        lowcutFreq.value = data.eq.lowCut.freq;
+      }
+      if (data.eq.highCut && data.eq.highCut.enabled) {
+        highCutEnabled = true;
+        highcutFreq.value = data.eq.highCut.freq;
+      }
+      updateCutVisuals();
+      updateAll();
+    }
+  } catch (e) { console.error(e); }
+}
+
+loadState();
+updateAll();
+updateCutVisuals();
+</script>
+</body>
+</html>
