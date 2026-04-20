@@ -1,6 +1,6 @@
 {
   "name": "eq-panel",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "System-wide audio equalizer for Windows — powered by EqualizerAPO",
   "main": "main.js",
   "author": "codyv",
@@ -45,6 +45,11 @@
       "icon.ico",
       "icon.png"
     ],
-    "extraResources": []
+    "extraResources": [
+      {
+        "from": "vendor/EqualizerAPO-installer.exe",
+        "to": "EqualizerAPO-installer.exe"
+      }
+    ]
   }
 }

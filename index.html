@@ -634,7 +634,25 @@ document.getElementById("reset-btn").onclick = () => {
 
 // --- Devices button ---
 document.getElementById("config-btn").onclick = async () => {
-  await ipcRenderer.invoke("open-configurator");
+  statusEl.textContent = ">>> OPENING DEVICES <<<";
+  statusEl.className = "status";
+  try {
+    const result = await ipcRenderer.invoke("open-configurator");
+    if (result && result.ok) {
+      statusEl.textContent = ">>> DEVICES OPENED <<<";
+      statusEl.className = "status ok";
+      setTimeout(() => {
+        statusEl.textContent = "";
+        statusEl.className = "status";
+      }, 1500);
+    } else {
+      statusEl.textContent = "ERR: " + ((result && result.error) || "unknown");
+      statusEl.className = "status";
+    }
+  } catch (e) {
+    statusEl.textContent = "ERR: " + e.message;
+    statusEl.className = "status";
+  }
 };
 
 // --- Apply ---

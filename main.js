@@ -9,12 +9,77 @@ const APO_CONFIGURATOR = "C:\\Program Files\\EqualizerAPO\\DeviceSelector.exe";
 const APO_DIR = "C:\\Program Files\\EqualizerAPO";
 const APO_DOWNLOAD_URL = "https://sourceforge.net/projects/equalizerapo/files/latest/download";
 
+// EqualizerAPO 1.4.x ships with the Qt platform plugin at qt\platforms\qwindows.dll
+// instead of the default platforms\qwindows.dll. Without a qt.conf pointing Qt at the
+// right folder, DeviceSelector.exe and Editor.exe die at launch with
+// "no Qt platform plugin could be initialized". We patch this on demand.
+const QT_PLUGIN_DEFAULT = path.join(APO_DIR, "platforms", "qwindows.dll");
+const QT_PLUGIN_ALT = path.join(APO_DIR, "qt", "platforms", "qwindows.dll");
+const QT_CONF = path.join(APO_DIR, "qt.conf");
+
+function bundledAPOInstaller() {
+  // In packaged app, extraResources land in process.resourcesPath.
+  // In dev, fall back to the vendor/ dir next to main.js.
+  const packaged = path.join(process.resourcesPath || "", "EqualizerAPO-installer.exe");
+  if (fs.existsSync(packaged)) return packaged;
+  const dev = path.join(__dirname, "vendor", "EqualizerAPO-installer.exe");
+  if (fs.existsSync(dev)) return dev;
+  return null;
+}
+
 function apoInstalled() {
   return fs.existsSync(APO_DIR);
 }
 
 function apoConfigured() {
   return fs.existsSync(APO_CONFIG);
+}
+
+function qtPatchState() {
+  if (fs.existsSync(QT_PLUGIN_DEFAULT)) return "ok";
+  if (fs.existsSync(QT_CONF)) {
+    try {
+      const conf = fs.readFileSync(QT_CONF, "utf8");
+      if (/Plugins\s*=\s*qt\b/i.test(conf) && fs.existsSync(QT_PLUGIN_ALT)) {
+        return "ok";
+      }
+    } catch {}
+  }
+  if (fs.existsSync(QT_PLUGIN_ALT)) return "fixable";
+  return "missing";
+}
+
+async function patchQt() {
+  const content = "[Paths]\r\nPlugins = qt\r\n";
+  try {
+    fs.writeFileSync(QT_CONF, content, "utf8");
+    if (qtPatchState() === "ok") return { ok: true };
+  } catch {}
+
+  const scriptPath = path.join(os.tmpdir(), "eq-panel-patch-qt.ps1");
+  const script =
+    `$dest = 'C:\\Program Files\\EqualizerAPO\\qt.conf'\r\n` +
+    `$content = "[Paths]\`r\`nPlugins = qt\`r\`n"\r\n` +
+    `Set-Content -Path $dest -Value $content -Encoding ASCII -Force -NoNewline\r\n`;
+  fs.writeFileSync(scriptPath, script, "utf8");
+
+  return new Promise((resolve) => {
+    const psCommand =
+      `Start-Process powershell -Verb RunAs -Wait -WindowStyle Hidden ` +
+      `-ArgumentList '-NoProfile','-ExecutionPolicy','Bypass','-File','${scriptPath}'`;
+    execFile(
+      "powershell.exe",
+      ["-NoProfile", "-Command", psCommand],
+      (err) => {
+        if (qtPatchState() === "ok") return resolve({ ok: true });
+        resolve({
+          error: err
+            ? "Repair cancelled or failed: " + err.message
+            : "Repair did not apply (UAC cancelled?)",
+        });
+      }
+    );
+  });
 }
 
 function writeEQ({ bands, preamp, lowCut, highCut }) {
@@ -179,12 +244,57 @@ app.whenReady().then(() => {
     }
   });
 
-  ipcMain.handle("open-configurator", () => {
-    if (fs.existsSync(APO_CONFIGURATOR)) {
-      execFile(APO_CONFIGURATOR, [], { cwd: APO_DIR });
-      return { ok: true };
+  ipcMain.handle("open-configurator", async () => {
+    if (!fs.existsSync(APO_CONFIGURATOR)) {
+      return { error: "DeviceSelector.exe not found. Install EqualizerAPO first." };
     }
-    return { error: "DeviceSelector.exe not found in " + APO_DIR };
+
+    const qt = qtPatchState();
+    if (qt === "missing") {
+      return {
+        error:
+          "EqualizerAPO Qt plugins missing. Try reinstalling EqualizerAPO via [INSTALL].",
+      };
+    }
+    if (qt === "fixable") {
+      const patched = await patchQt();
+      if (patched.error) return { error: patched.error };
+    }
+
+    return new Promise((resolve) => {
+      let settled = false;
+      const proc = execFile(APO_CONFIGURATOR, [], { cwd: APO_DIR }, (err) => {
+        if (settled) return;
+        settled = true;
+        if (err) {
+          resolve({ error: "DeviceSelector failed: " + err.message });
+        } else {
+          resolve({ ok: true });
+        }
+      });
+      proc.on("error", (err) => {
+        if (settled) return;
+        settled = true;
+        resolve({ error: "Could not launch DeviceSelector: " + err.message });
+      });
+      // If it stays alive past 600ms we assume it launched successfully.
+      // This catches fast-crash failures (e.g. Qt plugin errors) without
+      // making the user wait for them to close DeviceSelector normally.
+      setTimeout(() => {
+        if (settled) return;
+        settled = true;
+        resolve({ ok: true });
+      }, 600);
+    });
+  });
+
+  ipcMain.handle("repair-apo", async () => {
+    const qt = qtPatchState();
+    if (qt === "ok") return { ok: true, alreadyOk: true };
+    if (qt === "missing") {
+      return { error: "Qt plugins missing. Reinstall EqualizerAPO." };
+    }
+    return patchQt();
   });
 
   ipcMain.handle("open-apo-download", () => {
@@ -200,10 +310,13 @@ app.whenReady().then(() => {
     };
 
     try {
-      send({ stage: "downloading", percent: 0 });
-      const installerPath = await downloadAPO((p) => {
-        send({ stage: "downloading", percent: p.percent });
-      });
+      let installerPath = bundledAPOInstaller();
+      if (!installerPath) {
+        send({ stage: "downloading", percent: 0 });
+        installerPath = await downloadAPO((p) => {
+          send({ stage: "downloading", percent: p.percent });
+        });
+      }
 
       send({ stage: "launching" });
       // Launch installer; it will prompt for UAC elevation itself (NSIS installer).
