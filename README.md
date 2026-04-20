@@ -23,15 +23,19 @@ Works with any audio output — Bluetooth speakers, wired headphones, USB DACs, 
 
 ## Install
 
-1. Download and install [EqualizerAPO](https://sourceforge.net/projects/equalizerapo/)
-   - During install, **check the box next to your audio output device** (speakers, headphones, etc.)
-   - Reboot if prompted
-2. Download `EQ Panel Setup 1.0.0.exe` from [Releases](../../releases)
-3. Run and enjoy
+**See [INSTALL.md](INSTALL.md) for the step-by-step guide** (includes the Windows SmartScreen "More info → Run anyway" walkthrough — everyone hits this on first run).
+
+Quick version:
+
+1. Download `EQ Panel Setup 1.0.0.exe` from [Releases](../../releases).
+2. If SmartScreen blocks it: click **More info → Run anyway**.
+3. On first launch, click **INSTALL EQUALIZERAPO** — the app downloads and launches the installer for you.
+4. In the EqualizerAPO installer, check the box next to your audio device, then reboot.
+5. Done. Pick a preset and play.
 
 ## Portable Version
 
-Download `EQ Panel 1.0.0.exe` from [Releases](../../releases) — no install needed, just run it.
+Download `EQ Panel 1.0.0.exe` from [Releases](../../releases) — no install needed, just run it. You'll still need EqualizerAPO; the app offers to install it on first launch.
 
 ## How It Works
 

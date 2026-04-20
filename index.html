@@ -264,16 +264,25 @@
 <div id="setup-overlay" class="hidden">
   <div class="setup-box" id="setup-install">
     <h2>SETUP REQUIRED</h2>
-    <p>EQ Panel needs <strong>EqualizerAPO</strong> installed to process your audio.</p>
-    <p style="color:#1a8a1a;font-size:16px;">It's a free, open-source system-wide audio filter for Windows. Lightweight, no bloat.</p>
+    <p id="setup-install-msg">EQ Panel needs <strong>EqualizerAPO</strong> installed to process your audio.</p>
+    <p style="color:#1a8a1a;font-size:16px;">Free, open-source system-wide audio filter for Windows. One click below and we'll grab it for you.</p>
+    <div id="apo-progress-wrap" style="display:none;margin:16px 0;">
+      <div style="font-size:18px;color:#33ff33;margin-bottom:6px;" id="apo-progress-label">Downloading...</div>
+      <div style="height:10px;background:#0a0a0a;border:1px solid #1a3a1a;position:relative;">
+        <div id="apo-progress-bar" style="height:100%;width:0%;background:#33ff33;box-shadow:0 0 10px #33ff33;transition:width 0.2s;"></div>
+      </div>
+    </div>
     <br>
-    <button class="setup-btn" id="btn-download-apo">DOWNLOAD EQUALIZERAPO</button>
+    <button class="setup-btn" id="btn-install-apo">INSTALL EQUALIZERAPO</button>
     <br>
     <button class="setup-btn secondary" id="btn-skip-setup">I ALREADY INSTALLED IT</button>
+    <br>
+    <button class="setup-btn secondary" id="btn-manual-dl" style="display:none;">OPEN DOWNLOAD IN BROWSER</button>
   </div>
   <div class="setup-box" id="setup-configure" style="display:none;">
     <h2>SELECT AUDIO DEVICE</h2>
-    <p>Open the EqualizerAPO Configurator to select which audio output to apply EQ to (your JBL, headphones, etc).</p>
+    <p>Open the EqualizerAPO Configurator to pick which audio output to apply EQ to (speakers, headphones, JBL, etc).</p>
+    <p style="color:#1a8a1a;font-size:16px;">After selecting, EqualizerAPO may ask you to <strong>reboot</strong> — do that, then relaunch EQ Panel.</p>
     <br>
     <button class="setup-btn" id="btn-open-config">OPEN CONFIGURATOR</button>
     <br>
@@ -399,20 +408,62 @@ const overlay = document.getElementById("setup-overlay");
 const setupInstall = document.getElementById("setup-install");
 const setupConfigure = document.getElementById("setup-configure");
 
-document.getElementById("btn-download-apo").onclick = async () => {
-  await ipcRenderer.invoke("open-apo-download");
-  setupInstall.querySelector("p").textContent = "Download started! Install EqualizerAPO, then click below.";
-  document.getElementById("btn-skip-setup").textContent = "I INSTALLED IT - NEXT";
+const installMsg = document.getElementById("setup-install-msg");
+const progWrap = document.getElementById("apo-progress-wrap");
+const progBar = document.getElementById("apo-progress-bar");
+const progLabel = document.getElementById("apo-progress-label");
+const btnInstall = document.getElementById("btn-install-apo");
+const btnSkip = document.getElementById("btn-skip-setup");
+const btnManual = document.getElementById("btn-manual-dl");
+
+ipcRenderer.on("apo-install-progress", (_, payload) => {
+  progWrap.style.display = "block";
+  if (payload.stage === "downloading") {
+    progLabel.textContent = `Downloading EqualizerAPO... ${payload.percent}%`;
+    progBar.style.width = payload.percent + "%";
+  } else if (payload.stage === "launching") {
+    progLabel.textContent = "Launching installer... (approve the UAC prompt)";
+    progBar.style.width = "100%";
+  } else if (payload.stage === "waiting") {
+    progLabel.textContent = "Waiting for install to finish...";
+  } else if (payload.stage === "done") {
+    progLabel.textContent = "Installed! Moving on...";
+  } else if (payload.stage === "error") {
+    progLabel.textContent = "Download failed: " + (payload.error || "unknown");
+    btnManual.style.display = "inline-block";
+  } else if (payload.stage === "timeout") {
+    progLabel.textContent = "Install timed out. Try again or use the manual download.";
+    btnManual.style.display = "inline-block";
+  }
+});
+
+btnInstall.onclick = async () => {
+  btnInstall.disabled = true;
+  btnInstall.textContent = "WORKING...";
+  btnSkip.style.display = "none";
+  const result = await ipcRenderer.invoke("install-apo");
+  if (result.ok) {
+    setupInstall.style.display = "none";
+    setupConfigure.style.display = "block";
+  } else {
+    btnInstall.disabled = false;
+    btnInstall.textContent = "RETRY INSTALL";
+    btnSkip.style.display = "inline-block";
+  }
 };
 
-document.getElementById("btn-skip-setup").onclick = async () => {
+btnSkip.onclick = async () => {
   const status = await ipcRenderer.invoke("get-status");
   if (status.installed) {
     setupInstall.style.display = "none";
     setupConfigure.style.display = "block";
   } else {
-    setupInstall.querySelector("p").textContent = "EqualizerAPO not detected yet. Install it and try again.";
+    installMsg.textContent = "EqualizerAPO not detected. Install it first, then click again.";
   }
+};
+
+btnManual.onclick = async () => {
+  await ipcRenderer.invoke("open-apo-download");
 };
 
 document.getElementById("btn-open-config").onclick = async () => {
